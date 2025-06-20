@@ -3,8 +3,9 @@ import { Canvas } from '@react-three/fiber'
 import './App.css'
 import { Card } from './components/card/Card'
 import { useEffect, useRef, useState } from 'react';
-import { GizmoHelper, GizmoViewport, OrbitControls } from '@react-three/drei';
+import { GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { getRandomCardFromCache, initializeCardCache, type PokemonCard } from './services/pokemonAPI';
+import { MagneticPlane } from './components/board/MagneticPlane';
 
 type card = {
   position: [number, number, number],
@@ -17,6 +18,7 @@ function App() {
   const [isFirstBuy, setIsFirstBuy] = useState(true);
   const [cardDeck, setCardDeck] = useState<card[]>([]);
   const [cardHand, setCardHand] = useState<card[]>([]);
+  const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadingStatus, setLoadingStatus] = useState<string>('Initializing...');
   const groupRef = useRef<THREE.Group>(null);
@@ -87,7 +89,15 @@ function App() {
     }
   }
 
-    if (isLoading) {
+  const handleCardFocusChange = (cardId: string) => {
+    if (focusedCardId === cardId) {
+      setFocusedCardId(null);
+    } else {
+      setFocusedCardId(cardId);
+    }
+  }
+
+  if (isLoading) {
     return (
       <div style={{
         position: 'fixed',
@@ -129,12 +139,33 @@ function App() {
       <Canvas camera={{ position: [0, 7, 11], fov: 90 }}>
         <ambientLight />
 
+        <MagneticPlane />
+
         <group ref={groupRef} onClick={handleClickDeck}>
           {cardDeck.map((card) => {
-            return <Card key={card.id} position={card.position} rotation={card.rotation} isInHand={false} pokemonCard={card.pokemonCard}/>
+            return <Card 
+                      key={card.id} 
+                      cardId={card.id}
+                      position={card.position} 
+                      rotation={card.rotation} 
+                      isInHand={false} 
+                      pokemonCard={card.pokemonCard}
+                      isFocused={false}
+                      onFocusChange={handleCardFocusChange}
+                    />
           })}
           {cardHand.map((card) => {
-            return <Card key={card.id} position={card.position} rotation={card.rotation} isInHand={true} pokemonCard={card.pokemonCard}/> 
+            return <Card 
+                      key={card.id} 
+                      cardId={card.id}
+                      position={card.position} 
+                      rotation={card.rotation} 
+                      isInHand={true} 
+                      pokemonCard={card.pokemonCard} 
+                      xPosition={card.position[0]}
+                      isFocused={focusedCardId === card.id}
+                      onFocusChange={handleCardFocusChange}
+                    /> 
           })}
         </group>
 
@@ -142,7 +173,7 @@ function App() {
           <boxGeometry args={[2, 2, 2]} />
           <meshBasicMaterial color={"orange"} />
         </mesh>
-        <OrbitControls />
+        {/* <OrbitControls /> */}
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport
             axisColors={["#9d4b4b", "#2f7f4f", "#3b5b9d"]}
