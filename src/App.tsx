@@ -2,43 +2,80 @@ import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber'
 import './App.css'
 import { Card } from './components/card/Card'
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GizmoHelper, GizmoViewport, OrbitControls } from '@react-three/drei';
+import { getRandomCardFromCache, initializeCardCache, type PokemonCard } from './services/pokemonAPI';
 
 type card = {
   position: [number, number, number],
   rotation: [number, number, number],
-}
-
-const cards: card[] = [];
-for (let i = 0; i < 60; i++) {
-  cards.push({ position: [-12, -i * 0.02, 1], rotation: [Math.PI / 2, 0, 0] });
+  pokemonCard?: PokemonCard,
+  id: string
 }
 
 function App() {
   const [isFirstBuy, setIsFirstBuy] = useState(true);
-  const [cardDeck, setCardDeck] = useState<card[]>(cards);
+  const [cardDeck, setCardDeck] = useState<card[]>([]);
   const [cardHand, setCardHand] = useState<card[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadingStatus, setLoadingStatus] = useState<string>('Initializing...');
   const groupRef = useRef<THREE.Group>(null);
 
+  useEffect(() => {
+    const initializeDeck = async () => {
+      try {
+        setIsLoading(true);
+        setLoadingStatus('Loading card database...');
+
+        await initializeCardCache();
+
+        setLoadingStatus('Creating deck...');
+
+        const initialCards: card[] = [];
+        for (let i = 0; i < 60; i++) {
+          const pokemonCard = getRandomCardFromCache();
+          initialCards.push({
+            position: [-12, -i * 0.02, 1],
+            rotation: [Math.PI / 2, 0, 0],
+            pokemonCard,
+            id: `card-${i}`
+          });
+        }
+
+        setLoadingStatus('Finalizing...');
+        setCardDeck(initialCards);
+
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1000);
+      } catch (error) {
+        console.error('Error initializing deck:', error);
+        setLoadingStatus('Error loading cards. Please refresh.');
+      }
+    };
+
+    initializeDeck();
+  }, []);
+
   const handleClickDeck = () => {
-    if (isFirstBuy) {
+    if (isFirstBuy && cardDeck.length > 0) {
       const topCard = cardDeck.length - 5;
       const cardSpacing = 3;
       const totalWidth = (5 - 1) * cardSpacing; 
       const startX = -(totalWidth / 2); 
       const handArray: card[] = [];
-
-
       const deckArray: card[] = [];
+
       cardDeck.forEach((card, index) => {
         if (index >= topCard) {
           const handIndex = index - topCard; 
           const xPosition = startX + (handIndex * cardSpacing); 
 
-          card.position = [xPosition, 0, 8];
-          card.rotation = [-Math.PI / 4, 0, 0];
-          handArray.push(card)
+          handArray.push(({
+            ...card,
+            position: [xPosition, 0, 8],
+            rotation: [-Math.PI / 4, 0, 0]
+          }))
         } else {
           deckArray.push(card);
         }
@@ -50,17 +87,54 @@ function App() {
     }
   }
 
+    if (isLoading) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: 'black',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        color: 'white',
+        fontSize: '18px',
+        zIndex: 9999
+      }}>
+        <div style={{
+          marginBottom: '20px',
+          fontSize: '24px',
+          fontWeight: 'bold'
+        }}>
+          Pokemon TCG
+        </div>
+        <div style={{
+          padding: '20px',
+          background: 'rgba(0, 0, 0, 0.1)',
+          borderRadius: '10px',
+          backdropFilter: 'blur(10px)',
+          textAlign: 'center',
+        }}>
+          {loadingStatus}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      <Canvas camera={{ position: [0, 7, 10], fov: 90 }}>
+      <Canvas camera={{ position: [0, 7, 11], fov: 90 }}>
         <ambientLight />
 
         <group ref={groupRef} onClick={handleClickDeck}>
-          {cardDeck.map((card, index) => {
-            return <Card key={index} position={card.position} rotation={card.rotation} isInHand={false} />
+          {cardDeck.map((card) => {
+            return <Card key={card.id} position={card.position} rotation={card.rotation} isInHand={false} pokemonCard={card.pokemonCard}/>
           })}
-          {cardHand.map((card, index) => {
-            return <Card key={index} position={card.position} rotation={card.rotation} isInHand={true}/> 
+          {cardHand.map((card) => {
+            return <Card key={card.id} position={card.position} rotation={card.rotation} isInHand={true} pokemonCard={card.pokemonCard}/> 
           })}
         </group>
 
