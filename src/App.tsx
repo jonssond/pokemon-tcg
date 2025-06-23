@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { Canvas } from '@react-three/fiber'
+import { Canvas, type ThreeEvent } from '@react-three/fiber'
 import './App.css'
 import { Card } from './components/card/Card'
 import { useEffect, useRef, useState } from 'react';
 import { GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { getRandomCardFromCache, initializeCardCache, type PokemonCard } from './services/pokemonAPI';
-import { MagneticPlane } from './components/board/MagneticPlane';
+import { InvocationZone } from './components/board/InvocationZone';
+import { Gameboard } from './components/board/Gameboard';
 
 type card = {
   position: [number, number, number],
@@ -15,13 +16,31 @@ type card = {
 }
 
 function App() {
-  const [isFirstBuy, setIsFirstBuy] = useState(true);
   const [cardDeck, setCardDeck] = useState<card[]>([]);
   const [cardHand, setCardHand] = useState<card[]>([]);
-  const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
+  const [boardCards, setBoardCards] = useState<card[]>([]);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadingStatus, setLoadingStatus] = useState<string>('Initializing...');
+
+  const [isFirstBuy, setIsFirstBuy] = useState(true);
+  const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
+  const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
+  const [mouseWorldPosition, setMouseWorldPosition] = useState<THREE.Vector3>(new THREE.Vector3());
+
   const groupRef = useRef<THREE.Group>(null);
+
+  const invocationZoneBounds = {
+    x: { min: -1.5, max: 1.5 },
+    z: { min: -2.25, max: 2.25}
+  }
+
+  const isInInvocationZone = (position: THREE.Vector3): boolean => {
+    return position.x >= invocationZoneBounds.x.min &&
+           position.x <= invocationZoneBounds.x.max &&
+           position.z >= invocationZoneBounds.z.min &&
+           position.z <= invocationZoneBounds.z.max;
+  };
 
   useEffect(() => {
     const initializeDeck = async () => {
@@ -37,7 +56,7 @@ function App() {
         for (let i = 0; i < 60; i++) {
           const pokemonCard = getRandomCardFromCache();
           initialCards.push({
-            position: [-12, -i * 0.02, 1],
+            position: [-12, i * 0.02, 0],
             rotation: [Math.PI / 2, 0, 0],
             pokemonCard,
             id: `card-${i}`
@@ -61,27 +80,25 @@ function App() {
 
   const handleClickDeck = () => {
     if (isFirstBuy && cardDeck.length > 0) {
-      const topCard = cardDeck.length - 5;
+      const topCardsCount = 5;
       const cardSpacing = 3;
-      const totalWidth = (5 - 1) * cardSpacing; 
-      const startX = -(totalWidth / 2); 
+      const totalWidth = (5 - 1) * cardSpacing;
+      const startX = -(totalWidth / 2);
       const handArray: card[] = [];
       const deckArray: card[] = [];
 
-      cardDeck.forEach((card, index) => {
-        if (index >= topCard) {
-          const handIndex = index - topCard; 
-          const xPosition = startX + (handIndex * cardSpacing); 
+      const topCards = cardDeck.slice(-topCardsCount);
+      const remainingCards = cardDeck.slice(0, -topCardsCount);
+      deckArray.push(...remainingCards);
 
-          handArray.push(({
-            ...card,
-            position: [xPosition, 0, 8],
-            rotation: [-Math.PI / 4, 0, 0]
-          }))
-        } else {
-          deckArray.push(card);
-        }
-      })
+      topCards.forEach((card, index) => {
+        const xPosition = startX + (index * cardSpacing);
+        handArray.push({
+          ...card,
+          position: [xPosition, 2, 9],
+          rotation: [-Math.PI / 4, 0, 0]
+        })
+      });
 
       setCardDeck(deckArray);
       setCardHand(handArray);
@@ -94,6 +111,74 @@ function App() {
       setFocusedCardId(null);
     } else {
       setFocusedCardId(cardId);
+    }
+  }
+
+  const handleDragStart = () => {
+    setIsDraggingCard(true);
+    setFocusedCardId(null);
+  }
+
+  const handleDragEnd = (cardId: string, position: THREE.Vector3) => {
+    setIsDraggingCard(false);
+    if (isInInvocationZone(position)) {
+      const draggedCard = cardHand.find(card => card.id === cardId);
+      if (draggedCard) {
+        const newBoardCard: card = {
+          ...draggedCard,
+          position: [0, 0.02, 0],
+          rotation: [-Math.PI / 2, 0, 0]
+        }
+
+        // setCardHand(prevHand => prevHand.filter(card => card.id !== cardId));
+        const filteredHand = cardHand.filter(card => card.id !== cardId);
+        const newHand: card[] = [];
+        const cardSpacing = 3;
+        const totalWidth = (filteredHand.length - 1) * cardSpacing;
+        const startX = -(totalWidth / 2);
+
+        filteredHand.forEach((card, index) => {
+          const originalX = startX + (index * cardSpacing);
+          newHand.push({
+            ...card,
+            position: [originalX, 2, 9],
+            rotation: [-Math.PI / 4, 0, 0]
+          })
+        })
+        setCardHand(newHand);
+        setBoardCards(prevBoard => [...prevBoard, newBoardCard]);
+      }
+    } else {
+      const cardIndex = cardHand.findIndex(card => card.id === cardId);
+      if (cardIndex !== -1) {
+        const cardSpacing = 3;
+        const totalWidth = (cardHand.length - 1) * cardSpacing;
+        const startX = -(totalWidth / 2);
+        const originalX = startX + (cardIndex * cardSpacing);
+
+        setCardHand(prevHand => 
+          prevHand.map(card => {
+            if (card.id === cardId) {
+              return {
+                ...card,
+                position: [originalX, 2, 9],
+                rotation: [-Math.PI / 4, 0, 0]
+              };
+            }
+            return card;
+          })
+        );
+      }
+    }
+  };
+
+  const handleMousePosition = (event: ThreeEvent<PointerEvent>) => {
+    if (isDraggingCard) {
+      const boardIntersection = event.intersections.find(e => e.object.name === "board");
+  
+      if (boardIntersection && boardIntersection.point) {
+        setMouseWorldPosition(boardIntersection.point.clone());
+      }
     }
   }
 
@@ -136,43 +221,74 @@ function App() {
 
   return (
     <>
-      <Canvas camera={{ position: [0, 7, 11], fov: 90 }}>
+      <Canvas camera={{ position: [0, 9, 10], fov: 90, rotation: [-Math.PI / 4, 0, 0 ]}}>
         <ambientLight />
 
-        <MagneticPlane />
 
-        <group ref={groupRef} onClick={handleClickDeck}>
+        <group ref={groupRef} onClick={handleClickDeck} onPointerMove={(event) => handleMousePosition(event)}>
+          <Gameboard />
+          <InvocationZone />
+
           {cardDeck.map((card) => {
-            return <Card 
-                      key={card.id} 
-                      cardId={card.id}
-                      position={card.position} 
-                      rotation={card.rotation} 
-                      isInHand={false} 
-                      pokemonCard={card.pokemonCard}
-                      isFocused={false}
-                      onFocusChange={handleCardFocusChange}
-                    />
+            return <Card
+              key={card.id}
+              cardId={card.id}
+              position={card.position}
+              rotation={card.rotation}
+              isInHand={false}
+              pokemonCard={card.pokemonCard}
+              isFocused={false}
+              onFocusChange={handleCardFocusChange}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              mouseWorldPosition={mouseWorldPosition}
+              isDragging={isDraggingCard}
+              isOnBoard={false}
+            />
           })}
+
           {cardHand.map((card) => {
-            return <Card 
-                      key={card.id} 
-                      cardId={card.id}
-                      position={card.position} 
-                      rotation={card.rotation} 
-                      isInHand={true} 
-                      pokemonCard={card.pokemonCard} 
-                      xPosition={card.position[0]}
-                      isFocused={focusedCardId === card.id}
-                      onFocusChange={handleCardFocusChange}
-                    /> 
+            return <Card
+              key={card.id}
+              cardId={card.id}
+              position={card.position}
+              rotation={card.rotation}
+              isInHand={true}
+              pokemonCard={card.pokemonCard}
+              xPosition={card.position[0]}
+              isFocused={focusedCardId === card.id}
+              onFocusChange={handleCardFocusChange}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              mouseWorldPosition={mouseWorldPosition}
+              isDragging={isDraggingCard}
+              isOnBoard={false}
+            />
+          })}
+
+          {boardCards.map((card) => {
+            return <Card
+              key={card.id}
+              cardId={card.id}
+              position={card.position}
+              rotation={card.rotation}
+              isInHand={false}
+              pokemonCard={card.pokemonCard}
+              isFocused={focusedCardId === card.id}
+              onFocusChange={handleCardFocusChange}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              mouseWorldPosition={mouseWorldPosition}
+              isDragging={isDraggingCard}
+              isOnBoard={true}
+            />
           })}
         </group>
 
-        <mesh position={[0, 0, 0]}>
+        {/* <mesh position={[0, 0, 0]}>
           <boxGeometry args={[2, 2, 2]} />
           <meshBasicMaterial color={"orange"} />
-        </mesh>
+        </mesh> */}
         {/* <OrbitControls /> */}
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport
