@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const MagneticPlane = () => {
+export const InvocationZone = () => {
     return (
         <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[3, 4.5]}/>
