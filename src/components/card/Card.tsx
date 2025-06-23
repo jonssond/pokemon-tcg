@@ -12,7 +12,12 @@ type cardProps = {
     xPosition?: number,
     isFocused?: boolean,
     onFocusChange?: (cardId: string) => void,
-    cardId: string
+    cardId: string,
+    onDragStart?: (cardId: string) => void,
+    onDragEnd?: (cardId: string, position: THREE.Vector3) => void,
+    mouseWorldPosition: THREE.Vector3,
+    isDragging: boolean,
+    isOnBoard: boolean
 }
 
 export const Card = (props: cardProps) => {
@@ -22,13 +27,17 @@ export const Card = (props: cardProps) => {
     const [xPosition, setXPosition] = useState<number>(props.xPosition || 0);
     
     const [mouseRotation, setMouseRotation] = useState<number>(0);
-    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const [isRotating, setIsRotating] = useState<boolean>(false);
     const [lastMouseX, setLastMouseX] = useState<number>(0);
     const [hasDragged, setHasDragged] = useState<boolean>(false);
+    const [isDraggingThis, setIsDraggingThis] = useState<boolean>(false);
+    const [isPointerDown, setIsPointerDown] = useState<boolean>(false);
+
+    
 
     const isFocused = props.isFocused || false;
+    const isInHand = props.isInHand || false;
     const [isHovered, setIsHovered] = useState<boolean>(false);
-    const [isInHand, setIsInHand] = useState<boolean>(props.isInHand);
 
     const frontImageUrl = props.pokemonCard?.images.large || '/card_backside.png';
     const [frontTexture, backTexture] = useTexture([frontImageUrl, '/card_backside.png'], (textures) => {
@@ -41,11 +50,11 @@ export const Card = (props: cardProps) => {
     });
     
     const materials = useMemo(() => {
-        const frontTextureClone = frontTexture.clone();
-        const backTextureClone = frontTexture.clone();
+        // const frontTextureClone = frontTexture.clone();
+        // const backTextureClone = frontTexture.clone();
         
-        frontTextureClone.needsUpdate = true;
-        backTextureClone.needsUpdate = true;
+        // frontTextureClone.needsUpdate = true;
+        // backTextureClone.needsUpdate = true;
         
         return [
             new THREE.MeshStandardMaterial({ color: '#333333' }),
@@ -57,32 +66,65 @@ export const Card = (props: cardProps) => {
         ];
     }, [frontTexture, backTexture, props.pokemonCard?.id]);
 
+    // useEffect(() => {
+    //     if (isDraggingThis && props.mouseWorldPosition && ref.current) {
+    //         const newPosition = props.mouseWorldPosition.clone();
+    //         newPosition.y = 0.1;
+    //         setPositions([newPosition.x, newPosition.y, newPosition.z]);
+    //         setRotation([-Math.PI / 2, 0, 0]);
+    //     }
+    // }, [props.mouseWorldPosition, isDraggingThis]);
+
     useEffect(() => {
-        if (isFocused && isInHand) {
+        if (isFocused && (isInHand || props.isOnBoard)) {
             setPositions([0, 6, 8]);
             setRotation([-Math.PI / 5, 0, 0]);
             setMouseRotation(0);
         } else if (!isFocused && isInHand) {
-            setPositions([xPosition, 0, 8]);
+            setPositions([xPosition, 2, 9]);
             setRotation([-Math.PI / 4, 0, 0]);
             setMouseRotation(0);
+        } else if (!isFocused && props.isOnBoard) {
+            setPositions(props.position);
+            setRotation(props.rotation);
+            setMouseRotation(0);
         }
-    }, [isFocused, isInHand, xPosition]);
+    }, [isFocused, isInHand, xPosition, props.isOnBoard, props.position, props.rotation]);
 
     useEffect(() => {
         setXPosition(props.xPosition || 0);
     }, [props.xPosition]);
     
+    useEffect(() => {
+        if (!isDraggingThis) {
+            setPositions(props.position);
+            setRotation(props.rotation);
+        }
+    }, [props.position, props.rotation, isDraggingThis]);
+
     useFrame((state, delta) => {
-        if (isFocused) {
+        if (isDraggingThis && props.mouseWorldPosition && ref.current) {
+            const newPosition = props.mouseWorldPosition.clone();
+            newPosition.y = 0.1;
+            ref.current.position.copy(newPosition);
+            ref.current.rotation.set(-Math.PI / 2, 0, 0);
+        }
+        
+        if (isFocused && ref.current) {
             const clampedRotation = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, mouseRotation));
-            ref.current!.rotation.y = clampedRotation;
+            ref.current.rotation.y = clampedRotation;
         }
     });
 
     const handlePointerDown = (event: any) => {
         if (isFocused) {
-            setIsDragging(true);
+            setIsRotating(true);
+            setIsPointerDown(true);
+            setHasDragged(false);
+            setLastMouseX(event.clientX);
+            event.stopPropagation();
+        } else if (isInHand && !isFocused) {
+            setIsPointerDown(true);
             setHasDragged(false);
             setLastMouseX(event.clientX);
             event.stopPropagation();
@@ -90,12 +132,11 @@ export const Card = (props: cardProps) => {
     };
 
     const handlePointerMove = (event: any) => {
-        if (isDragging && isFocused) {
+        if (isRotating && isFocused && isPointerDown) {
             const deltaX = event.clientX - lastMouseX;
 
             if (Math.abs(deltaX) > 2) {
                 setHasDragged(true);
-
             }
             const rotationSensivity = 0.01;
             const newRotation = mouseRotation + deltaX * rotationSensivity;
@@ -104,12 +145,39 @@ export const Card = (props: cardProps) => {
             setMouseRotation(clampedRotation);
             setLastMouseX(event.clientX);
             event.stopPropagation();
-        }   
-    }
+        } else if (isInHand && !isFocused && !isDraggingThis && isPointerDown) {
+            const deltaX = event.clientX - lastMouseX;
 
-    const handlePointerUp = () => {
-        setIsDragging(false);
-    }
+            if (Math.abs(deltaX) > 5) {
+                setIsDraggingThis(true);
+                setHasDragged(true);
+                props.onDragStart?.(props.cardId);
+            }
+
+            event.stopPropagation();
+        } else if (isDraggingThis) {
+            setHasDragged(true);
+            event.stopPropagation();
+        }
+    };
+
+    const handlePointerUp = (event: any) => {
+        setIsPointerDown(false);
+        
+        if (isRotating) {
+            setIsRotating(false);
+        }
+
+        if (isDraggingThis) {
+            setIsDraggingThis(false);
+
+            if (ref.current) {
+                props.onDragEnd?.(props.cardId, ref.current.position);
+            }
+        }
+        
+        event?.stopPropagation();
+    };
 
     const handleClickCard = () => {
         if (hasDragged) {
@@ -117,13 +185,24 @@ export const Card = (props: cardProps) => {
             return;
         }
 
-        if (isInHand) {
+        if (isInHand || props.isOnBoard) {
             props.onFocusChange?.(props.cardId);
         } 
     };
 
+    const getCardScale = () => {
+        if (isHovered && isInHand && !isFocused && !props.isDragging) {
+            return 1.5; 
+        }
+        if (props.isOnBoard && !isInHand && !isFocused) {
+            return 2;
+        }
+        return 1; 
+    };
+
     return (
         <mesh 
+            name="card"
             ref={ref} 
             material={materials} 
             position={positions} 
@@ -133,7 +212,7 @@ export const Card = (props: cardProps) => {
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            scale={isHovered && isInHand && !isFocused ? 1.5 : 1}
+            scale={getCardScale()}
             onClick={handleClickCard}
         >
             <boxGeometry args={[3, 4.5, 0.03]} />
