@@ -130,7 +130,6 @@ function App() {
           rotation: [-Math.PI / 2, 0, 0]
         }
 
-        // setCardHand(prevHand => prevHand.filter(card => card.id !== cardId));
         const filteredHand = cardHand.filter(card => card.id !== cardId);
         const newHand: card[] = [];
         const cardSpacing = 3;
@@ -225,27 +224,29 @@ function App() {
         <ambientLight />
 
 
-        <group ref={groupRef} onClick={handleClickDeck} onPointerMove={(event) => handleMousePosition(event)}>
+        <group ref={groupRef}  onPointerMove={(event) => handleMousePosition(event)}>
           <Gameboard />
           <InvocationZone />
 
-          {cardDeck.map((card) => {
-            return <Card
-              key={card.id}
-              cardId={card.id}
-              position={card.position}
-              rotation={card.rotation}
-              isInHand={false}
-              pokemonCard={card.pokemonCard}
-              isFocused={false}
-              onFocusChange={handleCardFocusChange}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              mouseWorldPosition={mouseWorldPosition}
-              isDragging={isDraggingCard}
-              isOnBoard={false}
-            />
-          })}
+          <group onClick={handleClickDeck}>
+            {cardDeck.map((card) => {
+              return <Card
+                key={card.id}
+                cardId={card.id}
+                position={card.position}
+                rotation={card.rotation}
+                isInHand={false}
+                pokemonCard={card.pokemonCard}
+                isFocused={false}
+                onFocusChange={handleCardFocusChange}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                mouseWorldPosition={mouseWorldPosition}
+                isDragging={isDraggingCard}
+                isOnBoard={false}
+              />
+            })}
+          </group>
 
           {cardHand.map((card) => {
             return <Card
@@ -285,11 +286,6 @@ function App() {
           })}
         </group>
 
-        {/* <mesh position={[0, 0, 0]}>
-          <boxGeometry args={[2, 2, 2]} />
-          <meshBasicMaterial color={"orange"} />
-        </mesh> */}
-        {/* <OrbitControls /> */}
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport
             axisColors={["#9d4b4b", "#2f7f4f", "#3b5b9d"]}
