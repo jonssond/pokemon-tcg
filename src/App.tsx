@@ -7,6 +7,7 @@ import { GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { getRandomCardFromCache, initializeCardCache, type PokemonCard } from './services/pokemonAPI';
 import { InvocationZone } from './components/board/InvocationZone';
 import { Gameboard } from './components/board/Gameboard';
+import { CardDetails } from './components/cardDetails/CardDetails';
 
 type card = {
   position: [number, number, number],
@@ -24,7 +25,7 @@ function App() {
   const [loadingStatus, setLoadingStatus] = useState<string>('Initializing...');
 
   const [isFirstBuy, setIsFirstBuy] = useState(true);
-  const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
+  const [focusedCard, setFocusedCard] = useState<PokemonCard | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
   const [mouseWorldPosition, setMouseWorldPosition] = useState<THREE.Vector3>(new THREE.Vector3());
 
@@ -56,7 +57,7 @@ function App() {
         for (let i = 0; i < 60; i++) {
           const pokemonCard = getRandomCardFromCache();
           initialCards.push({
-            position: [-12, i * 0.02, 0],
+            position: [20, i * 0.02, 8],
             rotation: [Math.PI / 2, 0, 0],
             pokemonCard,
             id: `card-${i}`
@@ -95,8 +96,8 @@ function App() {
         const xPosition = startX + (index * cardSpacing);
         handArray.push({
           ...card,
-          position: [xPosition, 2, 9],
-          rotation: [-Math.PI / 4, 0, 0]
+          position: [xPosition, 8, 21],
+          rotation: [-Math.PI / 3, 0, 0]
         })
       });
 
@@ -106,17 +107,20 @@ function App() {
     }
   }
 
-  const handleCardFocusChange = (cardId: string) => {
-    if (focusedCardId === cardId) {
-      setFocusedCardId(null);
-    } else {
-      setFocusedCardId(cardId);
+  const handleCardFocusChange = (card: PokemonCard | undefined) => {
+    if (card) {
+      console.log(card);
+      if (focusedCard?.id === card.id) {
+        setFocusedCard(null);
+      } else {
+        setFocusedCard(card);
+      }
     }
   }
 
   const handleDragStart = () => {
     setIsDraggingCard(true);
-    setFocusedCardId(null);
+    setFocusedCard(null);
   }
 
   const handleDragEnd = (cardId: string, position: THREE.Vector3) => {
@@ -140,8 +144,8 @@ function App() {
           const originalX = startX + (index * cardSpacing);
           newHand.push({
             ...card,
-            position: [originalX, 2, 9],
-            rotation: [-Math.PI / 4, 0, 0]
+            position: [originalX, 8, 21],
+            rotation: [-Math.PI / 3, 0, 0]
           })
         })
         setCardHand(newHand);
@@ -160,8 +164,8 @@ function App() {
             if (card.id === cardId) {
               return {
                 ...card,
-                position: [originalX, 2, 9],
-                rotation: [-Math.PI / 4, 0, 0]
+                position: [originalX, 8, 21],
+                rotation: [-Math.PI / 3, 0, 0]
               };
             }
             return card;
@@ -220,10 +224,8 @@ function App() {
 
   return (
     <>
-      <Canvas camera={{ position: [0, 9, 10], fov: 90, rotation: [-Math.PI / 4, 0, 0 ]}}>
+      <Canvas camera={{ position: [0, 17, 20], fov: 90, rotation: [-Math.PI / 3, 0, 0 ]}}>
         <ambientLight />
-
-
         <group ref={groupRef}  onPointerMove={(event) => handleMousePosition(event)}>
           <Gameboard />
           <InvocationZone />
@@ -257,7 +259,7 @@ function App() {
               isInHand={true}
               pokemonCard={card.pokemonCard}
               xPosition={card.position[0]}
-              isFocused={focusedCardId === card.id}
+              isFocused={focusedCard?.id === card.pokemonCard!.id}
               onFocusChange={handleCardFocusChange}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
@@ -275,7 +277,7 @@ function App() {
               rotation={card.rotation}
               isInHand={false}
               pokemonCard={card.pokemonCard}
-              isFocused={focusedCardId === card.id}
+              isFocused={focusedCard?.id === card.pokemonCard!.id}
               onFocusChange={handleCardFocusChange}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
@@ -285,7 +287,6 @@ function App() {
             />
           })}
         </group>
-
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport
             axisColors={["#9d4b4b", "#2f7f4f", "#3b5b9d"]}
@@ -293,6 +294,7 @@ function App() {
           />
         </GizmoHelper>
       </Canvas>
+      {!!focusedCard && <CardDetails pokemonName={focusedCard.name} pokemonType={focusedCard.types}/>}
     </>
   )
 }
