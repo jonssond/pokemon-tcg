@@ -3,6 +3,7 @@ import api from "./api";
 export interface PokemonCard {
   id: string;
   name: string;
+  types: string[]; 
   images: {
     small: string;
     large: string;

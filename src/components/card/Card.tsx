@@ -11,7 +11,7 @@ type cardProps = {
     pokemonCard?: PokemonCard,
     xPosition?: number,
     isFocused?: boolean,
-    onFocusChange?: (cardId: string) => void,
+    onFocusChange?: (cardId: PokemonCard | undefined) => void,
     cardId: string,
     onDragStart?: (cardId: string) => void,
     onDragEnd?: (cardId: string, position: THREE.Vector3) => void,
@@ -62,12 +62,12 @@ export const Card = (props: cardProps) => {
 
     useEffect(() => {
         if (isFocused && (isInHand || props.isOnBoard)) {
-            setPositions([0, 6, 8]);
-            setRotation([-Math.PI / 5, 0, 0]);
+            setPositions([0, 14, 18]);
+            setRotation([-Math.PI / 3, 0, 0]);
             setMouseRotation(0);
         } else if (!isFocused && isInHand) {
-            setPositions([xPosition, 2, 9]);
-            setRotation([-Math.PI / 4, 0, 0]);
+            setPositions([xPosition, 8, 21]);
+            setRotation([-Math.PI / 3, 0, 0]);
             setMouseRotation(0);
         } else if (!isFocused && props.isOnBoard) {
             setPositions(props.position);
@@ -178,7 +178,7 @@ export const Card = (props: cardProps) => {
         }
 
         if (isInHand || props.isOnBoard) {
-            props.onFocusChange?.(props.cardId);
+            props.onFocusChange?.(props.pokemonCard);
         } 
     };
 
