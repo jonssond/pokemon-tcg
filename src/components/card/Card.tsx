@@ -49,13 +49,7 @@ export const Card = (props: cardProps) => {
         })
     });
     
-    const materials = useMemo(() => {
-        // const frontTextureClone = frontTexture.clone();
-        // const backTextureClone = frontTexture.clone();
-        
-        // frontTextureClone.needsUpdate = true;
-        // backTextureClone.needsUpdate = true;
-        
+    const materials = useMemo(() => {        
         return [
             new THREE.MeshStandardMaterial({ color: '#333333' }),
             new THREE.MeshStandardMaterial({ color: '#333333' }),
@@ -65,15 +59,6 @@ export const Card = (props: cardProps) => {
             new THREE.MeshStandardMaterial({ map: backTexture }),
         ];
     }, [frontTexture, backTexture, props.pokemonCard?.id]);
-
-    // useEffect(() => {
-    //     if (isDraggingThis && props.mouseWorldPosition && ref.current) {
-    //         const newPosition = props.mouseWorldPosition.clone();
-    //         newPosition.y = 0.1;
-    //         setPositions([newPosition.x, newPosition.y, newPosition.z]);
-    //         setRotation([-Math.PI / 2, 0, 0]);
-    //     }
-    // }, [props.mouseWorldPosition, isDraggingThis]);
 
     useEffect(() => {
         if (isFocused && (isInHand || props.isOnBoard)) {
@@ -108,12 +93,17 @@ export const Card = (props: cardProps) => {
             newPosition.y = 0.1;
             ref.current.position.copy(newPosition);
             ref.current.rotation.set(-Math.PI / 2, 0, 0);
+        } else if (ref.current) {
+            ref.current.position.set(positions[0], positions[1], positions[2]);
+            ref.current.rotation.set(rotation[0], rotation[1], rotation[2]);
         }
         
         if (isFocused && ref.current) {
             const clampedRotation = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, mouseRotation));
             ref.current.rotation.y = clampedRotation;
         }
+
+        
     });
 
     const handlePointerDown = (event: any) => {
@@ -174,6 +164,8 @@ export const Card = (props: cardProps) => {
             if (ref.current) {
                 props.onDragEnd?.(props.cardId, ref.current.position);
             }
+
+            setHasDragged(false);
         }
         
         event?.stopPropagation();
